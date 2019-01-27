@@ -2,3 +2,4 @@ Revision history for perl distribution Devel-MojoProf
 
 0.01 Not Released
  - Started project
+ - Add profiling for Mojo::UserAgent
