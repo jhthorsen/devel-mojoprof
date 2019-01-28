@@ -12,13 +12,14 @@ use constant DEBUG  => $ENV{DEVEL_MOJOPROF_DEBUG} // 1;
 has reporter => sub { \&_default_reporter };
 
 sub add_profiling_for {
+  my $params = ref $_[-1] eq 'HASH' ? pop : {};
   my $self = _instance(shift);
   return $self->can("_add_profiling_for_$_[0]")->($self) if @_ == 1;
 
   return unless my $target = $self->_ensure_loaded(shift);
   while (my $method = shift) {
     next if $self->{installed}{$target}{$method}++;
-    $self->_add_profiling_for_method($target, $method, ref $_[0] ? shift : undef);
+    $self->_add_profiling_for_method($target, $method, ref $_[0] ? shift : undef, $params);
   }
 
   return $self;
@@ -34,13 +35,17 @@ sub import {
 sub singleton { state $self = __PACKAGE__->new }
 
 sub _add_profiling_for_method {
-  my ($self, $target, $method, $make_message) = @_;
+  my ($self, $target, $method, $make_message, $params) = @_;
+
+  my %params = (ignore_caller => qr{^$target}, %$params);
+  $make_message ||= sub { shift; join ' ', @_ };
 
   install_modifier $target => around => $method => sub {
     my ($orig, @args) = @_;
     my $wantarray = wantarray;
     my %report = (class => $target, method => $method);
-    _add_caller_to_report($target, \%report) if CALLER;
+
+    _add_caller_to_report(\%params, \%report) if CALLER;
 
     my $cb = ref $args[-1] eq 'CODE' ? pop @args : undef;
     push @args, sub { $self->_report_for(\%report, $make_message->(@args)); $cb->(@_) }
@@ -64,11 +69,11 @@ sub _add_profiling_for_method {
 }
 
 sub _add_caller_to_report {
-  my ($target, $report) = @_;
+  my ($params, $report) = @_;
 
   my $i = 0;
   while (my @caller = caller($i++)) {
-    next if $caller[0] eq $target or $caller[0] eq 'Devel::MojoProf';
+    next if $caller[0] eq 'Devel::MojoProf' or $caller[0] =~ $params->{ignore_caller};
     @$report{qw(file line)} = @caller[1, 2];
     last;
   }
@@ -84,6 +89,12 @@ sub _add_profiling_for_mysql {
   my $self = shift;
   $self->add_profiling_for('Mojo::mysql::Database', query => \&_make_desc_for_db, query_p => \&_make_desc_for_db)
     if $self->_ensure_loaded('Mojo::mysql', 1);
+}
+
+sub _add_profiling_for_redis {
+  my $self = shift;
+  $self->add_profiling_for('Mojo::Redis::Connection', 'write_p', {ignore_caller => qr{^Mojo::Redis}})
+    if $self->_ensure_loaded('Mojo::Redis', 1);
 }
 
 sub _add_profiling_for_sqlite {
