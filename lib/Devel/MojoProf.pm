@@ -7,14 +7,16 @@ use Scalar::Util 'blessed';
 use Time::HiRes qw(gettimeofday tv_interval);
 
 use constant CALLER => $ENV{DEVEL_MOJOPROF_CALLER} // 1;
-use constant DEBUG  => $ENV{DEVEL_MOJOPROF_DEBUG} // 1;
+
+# Required for "perl -d:MojoProf ..."
+DB->can('DB') or *DB::DB = sub { };
 
 has reporter => sub { \&_default_reporter };
 
 sub add_profiling_for {
   my $params = ref $_[-1] eq 'HASH' ? pop : {};
   my $self = _instance(shift);
-  return $self->can("_add_profiling_for_$_[0]")->($self) if @_ == 1;
+  return $self->tap($self->can("_add_profiling_for_$_[0]")) if @_ == 1;
 
   return unless my $target = $self->_ensure_loaded(shift);
   while (my $method = shift) {
@@ -27,7 +29,7 @@ sub add_profiling_for {
 
 sub import {
   my $class = shift;
-  my @flags = @_ ? @_ : qw(-pg -mysql -sqlite -ua);
+  my @flags = @_ ? @_ : qw(-mysql -pg -redis -sqlite -ua);
 
   $class->add_profiling_for($_) for map { s!^-!!; $_ } @flags;
 }
@@ -109,15 +111,15 @@ sub _add_profiling_for_ua {
 
 sub _default_reporter {
   my ($self, $report) = @_;
-  return warn sprintf "%0.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
-  return warn sprintf "%0.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
+  return printf STDERR "%0.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
+  return printf STDERR "%0.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
 }
 
 sub _ensure_loaded {
   my ($self, $target, $no_warn) = @_;
   return $target unless my $e = load_class $target;
   die "[Devel::MojoProf] Could not load $target: $e" if ref $e;
-  warn "[Devel::MojoProf] Could not find module $target\n" if DEBUG and !$no_warn;
+  warn "[Devel::MojoProf] Could not find module $target\n" unless $no_warn;
   return;
 }
 
@@ -133,3 +135,136 @@ sub _report_for {
 }
 
 1;
+
+=encoding utf8
+
+=head1 NAME
+
+Devel::MojoProf - Profile blocking, non-blocking a promise based Mojolicious APIs
+
+=head1 SYNOPSIS
+
+  $ perl -d:MojoProf myapp.pl
+  $ perl -d:MojoProf -e'Mojo::UserAgent->new->get("https://mojolicious.org")'
+
+=head1 DESCRIPTION
+
+L<Devel::MojoProf> can add profiling output for blocking, non-blocking and
+promise based methods. It can be customized to log however you want, but the
+default is to print a line like the one below to STDERR:
+
+  0.00038ms [Mojo::Pg::Database::query_p] SELECT 1 as whatever at path/to/app.pl line 23
+
+=head1 ATTRIBUTES
+
+=head2 reporter
+
+  my $cb   = $prof->reporter;
+  my $prof = $prof->reporter(sub { my ($prof, $report) = @_; ... });
+
+A callback used to generate a log message for a profiled method. See the
+description for the default output. The C<$report> variable is a hash-ref with
+the following example information:
+
+  {
+    file    => "path/to/app.pl",
+    line    => 23,
+    class   => "Mojo::Pg::Database",
+    method  => "query_p",
+    t0      => [Time::HiRes::gettimeofday],
+    elapsed => Time::HiRes::tv_interval($report->{t0}),
+    message => "SELECT 1 as whatever",
+  }
+
+The C<$report> above will result in the following output, using the default
+L</reporter>:
+
+  0.00038ms [Mojo::Pg::Database::query_p] SELECT 1 as whatever at path/to/app.pl line 23
+
+The log format is currently EXPERIMENTAL and could be changed.
+
+Note that the C<file> and C<line> keys can be disabled by setting the
+C<DEVEL_MOJOPROF_CALLER> environment variable to "0". This can be useful to
+speed up the run of the program.
+
+=head1 METHODS
+
+=head2 add_profiling_for
+
+  my $prof = $prof->add_profiling_for($moniker);
+  my $prof = $prof->add_profiling_for($class => $method1, $method2, ...);
+  my $prof = $prof->add_profiling_for($class => $method1 => $make_message, ...);
+  my $prof = $prof->add_profiling_for($class => $method1 => $make_message, ..., \%params);
+  my $prof = $prof->add_profiling_for($class => $method1 => $make_message, ..., \%params);
+  my $prof = Devel::MojoProf->add_profiling_for(...);
+
+Used to add profiling for either a C<$moniker> (short module identifier) or a
+class and method. This method can also be called as a class method.
+
+The supported C<$moniker> are for now "mysql", "pg", "redis", "sqlite" and
+"ua". See L</import> for more details.
+
+It is also possible to manually add support for other custom modules. Here is
+an example:
+
+  $prof->add_profiling_for("My::Cool::Class", "get_stuff" => sub {
+    my ($my_cool_obj, @args) = @_;
+    return "This will be the 'message' part in the report";
+  });
+
+The CODE ref passed in will get all the arguments that the C<get_suff()> method
+gets, and the return value should be a string that becomes the C<message> part
+in the C<$report> hash-ref passed to the L</reporter>.
+
+C<%params> is optional and can have the following keys:
+
+=over 2
+
+=item * ignore_caller
+
+Defaults to a regex holding the C<$class>, but can set to any class that you
+want to skip to generate the C<class> key for the L</reporter> method.
+
+=back
+
+=head2 import
+
+  use Devel::MojoProf (); # disable auto-detect
+  use Devel::MojoProf;    # All of the modules from the list below
+  use Devel::MojoProf -mysql;
+  use Devel::MojoProf -pg;
+  use Devel::MojoProf -redis;
+  use Devel::MojoProf -sqlite;
+  use Devel::MojoProf -ua;
+  use Devel::MojoProf -pg, -redis, -ua; # Load multiple
+
+Used to automatically L</add_profiling_for> know modules. Currently supported
+modules are L<Mojo::mysql>, L<Mojo::Pg>, L<Mojo::Redis>, L<Mojo::SQLite> and
+L<Mojo::UserAgent>.
+
+Please submit a PR or create an issue if you think more modules should be
+supported at L<https://github.com/jhthorsen/devel-mojoprof>.
+
+=head2 singleton
+
+  my $prof = Devel::MojoProf->singleton;
+
+Used to retrive the singleton object that is used by L</add_profiling_for> when
+called as a class method.
+
+=head1 AUTHOR
+
+Jan Henning Thorsen
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2018, Jan Henning Thorsen.
+
+This program is free software, you can redistribute it and/or modify it
+under the terms of the Artistic License version 2.0.
+
+=head1 SEE ALSO
+
+This module is inspired by L<Devel::KYTProf>.
+
+=cut
