@@ -26,7 +26,7 @@ sub add_profiling_for {
 
 sub import {
   my $class = shift;
-  my @flags = @_ ? @_ : qw(-ua);
+  my @flags = @_ ? @_ : qw(-pg -mysql -sqlite -ua);
 
   $class->add_profiling_for($_) for map { s!^-!!; $_ } @flags;
 }
@@ -74,30 +74,46 @@ sub _add_caller_to_report {
   }
 }
 
+sub _add_profiling_for_pg {
+  my $self = shift;
+  $self->add_profiling_for('Mojo::Pg::Database', query => \&_make_desc_for_db, query_p => \&_make_desc_for_db)
+    if $self->_ensure_loaded('Mojo::Pg', 1);
+}
+
+sub _add_profiling_for_mysql {
+  my $self = shift;
+  $self->add_profiling_for('Mojo::mysql::Database', query => \&_make_desc_for_db, query_p => \&_make_desc_for_db)
+    if $self->_ensure_loaded('Mojo::mysql', 1);
+}
+
+sub _add_profiling_for_sqlite {
+  my $self = shift;
+  $self->add_profiling_for('Mojo::SQLite::Database', query => \&_make_desc_for_db)
+    if $self->_ensure_loaded('Mojo::SQLite', 1);
+}
+
 sub _add_profiling_for_ua {
   shift->add_profiling_for('Mojo::UserAgent', start => \&_make_desc_for_ua, start_p => \&_make_desc_for_ua);
 }
 
 sub _default_reporter {
   my ($self, $report) = @_;
-  return warn sprintf "%sms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
-  return warn sprintf "%sms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
+  return warn sprintf "%0.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
+  return warn sprintf "%0.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
 }
 
 sub _ensure_loaded {
-  my ($self, $target) = @_;
+  my ($self, $target, $no_warn) = @_;
   return $target unless my $e = load_class $target;
   die "[Devel::MojoProf] Could not load $target: $e" if ref $e;
-  warn "[Devel::MojoProf] Could not find module $target\n" if DEBUG;
+  warn "[Devel::MojoProf] Could not find module $target\n" if DEBUG and !$no_warn;
   return;
 }
 
 sub _instance { ref $_[0] ? $_[0] : shift->singleton }
 
-sub _make_desc_for_ua {
-  my ($obj, $tx) = @_;
-  return sprintf '%s %s', $tx->req->method, $tx->req->url->to_abs;
-}
+sub _make_desc_for_db { $_[1] }
+sub _make_desc_for_ua { sprintf '%s %s', $_[1]->req->method, $_[1]->req->url->to_abs }
 
 sub _report_for {
   my ($self, $report, $message) = @_;
