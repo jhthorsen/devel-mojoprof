@@ -106,7 +106,7 @@ sub _add_profiling_for_sqlite {
 }
 
 sub _add_profiling_for_ua {
-  shift->add_profiling_for('Mojo::UserAgent', start => \&_make_desc_for_ua, start_p => \&_make_desc_for_ua);
+  shift->add_profiling_for('Mojo::UserAgent', start => \&_make_desc_for_ua);
 }
 
 sub _default_reporter {
