@@ -2,6 +2,7 @@ package Devel::MojoProf;
 use Mojo::Base -base;
 
 use Class::Method::Modifiers 'install_modifier';
+use Devel::MojoProf::Reporter;
 use Mojo::Loader 'load_class';
 use Scalar::Util 'blessed';
 use Time::HiRes qw(gettimeofday tv_interval);
@@ -12,8 +13,6 @@ our $VERSION = '0.01';
 
 # Required for "perl -d:MojoProf ..."
 DB->can('DB') or *DB::DB = sub { };
-
-has reporter => sub { \&_default_reporter };
 
 sub add_profiling_for {
   my $params = ref $_[-1] eq 'HASH' ? pop : {};
@@ -34,6 +33,19 @@ sub import {
   my @flags = @_ ? @_ : qw(-mysql -pg -redis -sqlite -ua);
 
   $class->add_profiling_for($_) for map { s!^-!!; $_ } @flags;
+}
+
+sub new {
+  my $self = shift->SUPER::new(@_);
+  $self->reporter($self->{reporter} || Devel::MojoProf::Reporter->new);
+  $self;
+}
+
+sub reporter {
+  my $self = shift;
+  return $self->{reporter} unless @_;
+  $self->{reporter} = blessed $_[0] ? $_[0] : Devel::MojoProf::Reporter->new->handler($_[0]);
+  return $self;
 }
 
 sub singleton { state $self = __PACKAGE__->new }
@@ -111,12 +123,6 @@ sub _add_profiling_for_ua {
   shift->add_profiling_for('Mojo::UserAgent', start => \&_make_desc_for_ua);
 }
 
-sub _default_reporter {
-  my ($self, $report) = @_;
-  return printf STDERR "%0.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
-  return printf STDERR "%0.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
-}
-
 sub _ensure_loaded {
   my ($self, $target, $no_warn) = @_;
   return $target unless my $e = load_class $target;
@@ -133,7 +139,7 @@ sub _make_desc_for_ua { sprintf '%s %s', $_[1]->req->method, $_[1]->req->url->to
 sub _report_for {
   my ($self, $report, $message) = @_;
   @$report{qw(elapsed message)} = (tv_interval($report->{t0}), $message);
-  $self->reporter->($self, $report);
+  $self->{reporter}->report($report, $self);
 }
 
 1;
@@ -161,33 +167,11 @@ default is to print a line like the one below to STDERR:
 
 =head2 reporter
 
-  my $cb   = $prof->reporter;
-  my $prof = $prof->reporter(sub { my ($prof, $report) = @_; ... });
+  my $obj  = $prof->reporter;
+  my $prof = $prof->reporter($reporter_class->new);
 
-A callback used to generate a log message for a profiled method. See the
-description for the default output. The C<$report> variable is a hash-ref with
-the following example information:
-
-  {
-    file    => "path/to/app.pl",
-    line    => 23,
-    class   => "Mojo::Pg::Database",
-    method  => "query_p",
-    t0      => [Time::HiRes::gettimeofday],
-    elapsed => Time::HiRes::tv_interval($report->{t0}),
-    message => "SELECT 1 as whatever",
-  }
-
-The C<$report> above will result in the following output, using the default
-L</reporter>:
-
-  0.00038ms [Mojo::Pg::Database::query_p] SELECT 1 as whatever at path/to/app.pl line 23
-
-The log format is currently EXPERIMENTAL and could be changed.
-
-Note that the C<file> and C<line> keys can be disabled by setting the
-C<DEVEL_MOJOPROF_CALLER> environment variable to "0". This can be useful to
-speed up the run of the program.
+Holds a reporter object that is capable of creating reports by the measurements
+done by C<$prof>. Holds by default an instance of L<Devel::MojoProf::Reporter>.
 
 =head1 METHODS
 

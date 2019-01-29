@@ -1,5 +1,8 @@
 Revision history for perl distribution Devel-MojoProf
 
+0.02 Not Released
+ - Changed "reporter" into an object
+
 0.01 2019-01-29T13:44:21+0900
  - Started project
  - Add profiling for Mojo::UserAgent
