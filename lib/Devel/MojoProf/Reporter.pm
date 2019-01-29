@@ -1,14 +1,40 @@
 package Devel::MojoProf::Reporter;
 use Mojo::Base -base;
 
+use Mojo::File 'path';
+
 has handler => undef;
+has out_csv => $ENV{DEVEL_MOJOPROF_OUT_CSV};
 
 # Note that $prof is just here to be back compat
 sub report {
   my ($self, $report, $prof) = @_;
+
+  if ($self->{out_fh} ||= $self->_build_out_fh) {
+    my $message = $report->{message};
+    $message =~ s!"!""!g;
+    return printf {$self->{out_fh}} qq(%s,%.5f,%s,%s,%s,%s,"%s"\n), $report->{t0}[0],
+      @$report{qw(elapsed class method file line)}, $message;
+  }
+
   return $self->{handler}->($prof, $report) if $self->{handler};
-  return printf STDERR "%0.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
-  return printf STDERR "%0.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
+  return printf STDERR "%.5fms [%s::%s] %s\n", @$report{qw(elapsed class method message)} unless $report->{line};
+  return printf STDERR "%.5fms [%s::%s] %s at %s line %s\n", @$report{qw(elapsed class method message file line)};
+}
+
+sub _build_out_fh {
+  my $self = shift;
+  my $path = $self->out_csv or return;
+
+  $path = "devel-mojoprof-reporter-$^T.csv" if $path eq '1';
+  die "[Devel::MojoProf] Cannot overwrite existing $path report.\n" if -e $path;
+
+  $path = path $path;
+  my $fh = $path->open('>');
+  $fh->autoflush(1);
+  printf {$fh} "%s\n", join ',', qw(t0 elapsed class method file line message);
+  $self->out_csv($path->to_abs);
+  return $fh;
 }
 
 1;
@@ -39,11 +65,25 @@ Only useful to be back compat with L<Devel::MojoProf> 0.01:
 
 Will be removed in the future.
 
+=head2 out_csv
+
+  $str      = $reporter->out_csv;
+  $reporter = $reporter->out_csv("/path/to/file.csv");
+
+Setting this attribute will cause L</report> to print the results to a CSV
+file, instead of printing to STDERR. This will allow you to post-process
+the information in a structured way in your favorite spreadsheet editor.
+
+You can also set the environment variable C<DEVEL_MOJOPROF_OUT_CSV> to a given
+file or give it a special value "1", which will generate a file in the current
+directory for you, with the filename "devel-mojoprof-reporter-1548746277.csv",
+where "1548746277" will be the unix timestamp of when you started the run.
+
 =head1 METHODS
 
 =head2 report
 
-  $self->report(\%report);
+  $reporter->report(\%report);
 
 Will be called every time a meassurement has been done by L<Devel::MojoProf>.
 

@@ -154,6 +154,9 @@ Devel::MojoProf - Profile blocking, non-blocking a promise based Mojolicious API
 
   $ perl -d:MojoProf myapp.pl
   $ perl -d:MojoProf -e'Mojo::UserAgent->new->get("https://mojolicious.org")'
+  $ DEVEL_MOJOPROF_OUT_CSV=1 perl -d:MojoProf myapp.pl
+
+See L<Devel::MojoProf::Reporter/out_csv> for how C<DEVEL_MOJOPROF_OUT_CSV> works.
 
 =head1 DESCRIPTION
 
