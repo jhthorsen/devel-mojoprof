@@ -8,6 +8,8 @@ use Time::HiRes qw(gettimeofday tv_interval);
 
 use constant CALLER => $ENV{DEVEL_MOJOPROF_CALLER} // 1;
 
+our $VERSION = '0.01';
+
 # Required for "perl -d:MojoProf ..."
 DB->can('DB') or *DB::DB = sub { };
 
@@ -15,7 +17,7 @@ has reporter => sub { \&_default_reporter };
 
 sub add_profiling_for {
   my $params = ref $_[-1] eq 'HASH' ? pop : {};
-  my $self = _instance(shift);
+  my $self   = _instance(shift);
   return $self->tap($self->can("_add_profiling_for_$_[0]")) if @_ == 1;
 
   return unless my $target = $self->_ensure_loaded(shift);
@@ -45,7 +47,7 @@ sub _add_profiling_for_method {
   install_modifier $target => around => $method => sub {
     my ($orig, @args) = @_;
     my $wantarray = wantarray;
-    my %report = (class => $target, method => $method);
+    my %report    = (class => $target, method => $method);
 
     _add_caller_to_report(\%params, \%report) if CALLER;
 
