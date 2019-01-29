@@ -6,6 +6,9 @@ Devel::MojoProf - Profile blocking, non-blocking a promise based Mojolicious API
 
     $ perl -d:MojoProf myapp.pl
     $ perl -d:MojoProf -e'Mojo::UserAgent->new->get("https://mojolicious.org")'
+    $ DEVEL_MOJOPROF_OUT_CSV=1 perl -d:MojoProf myapp.pl
+
+See ["out\_csv" in Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel::MojoProf::Reporter#out_csv) for how `DEVEL_MOJOPROF_OUT_CSV` works.
 
 # DESCRIPTION
 
@@ -19,33 +22,11 @@ default is to print a line like the one below to STDERR:
 
 ## reporter
 
-    my $cb   = $prof->reporter;
-    my $prof = $prof->reporter(sub { my ($prof, $report) = @_; ... });
+    my $obj  = $prof->reporter;
+    my $prof = $prof->reporter($reporter_class->new);
 
-A callback used to generate a log message for a profiled method. See the
-description for the default output. The `$report` variable is a hash-ref with
-the following example information:
-
-    {
-      file    => "path/to/app.pl",
-      line    => 23,
-      class   => "Mojo::Pg::Database",
-      method  => "query_p",
-      t0      => [Time::HiRes::gettimeofday],
-      elapsed => Time::HiRes::tv_interval($report->{t0}),
-      message => "SELECT 1 as whatever",
-    }
-
-The `$report` above will result in the following output, using the default
-["reporter"](#reporter):
-
-    0.00038ms [Mojo::Pg::Database::query_p] SELECT 1 as whatever at path/to/app.pl line 23
-
-The log format is currently EXPERIMENTAL and could be changed.
-
-Note that the `file` and `line` keys can be disabled by setting the
-`DEVEL_MOJOPROF_CALLER` environment variable to "0". This can be useful to
-speed up the run of the program.
+Holds a reporter object that is capable of creating reports by the measurements
+done by `$prof`. Holds by default an instance of [Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel::MojoProf::Reporter).
 
 # METHODS
 
