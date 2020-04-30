@@ -8,11 +8,11 @@ Devel::MojoProf - Profile blocking, non-blocking a promise based Mojolicious API
     $ perl -d:MojoProf -e'Mojo::UserAgent->new->get("https://mojolicious.org")'
     $ DEVEL_MOJOPROF_OUT_CSV=1 perl -d:MojoProf myapp.pl
 
-See ["out\_csv" in Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel::MojoProf::Reporter#out_csv) for how `DEVEL_MOJOPROF_OUT_CSV` works.
+See ["out\_csv" in Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel%3A%3AMojoProf%3A%3AReporter#out_csv) for how `DEVEL_MOJOPROF_OUT_CSV` works.
 
 # DESCRIPTION
 
-[Devel::MojoProf](https://metacpan.org/pod/Devel::MojoProf) can add profiling output for blocking, non-blocking and
+[Devel::MojoProf](https://metacpan.org/pod/Devel%3A%3AMojoProf) can add profiling output for blocking, non-blocking and
 promise based methods. It can be customized to log however you want, but the
 default is to print a line like the one below to STDERR:
 
@@ -26,7 +26,7 @@ default is to print a line like the one below to STDERR:
     my $prof = $prof->reporter($reporter_class->new);
 
 Holds a reporter object that is capable of creating reports by the measurements
-done by `$prof`. Holds by default an instance of [Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel::MojoProf::Reporter).
+done by `$prof`. Holds by default an instance of [Devel::MojoProf::Reporter](https://metacpan.org/pod/Devel%3A%3AMojoProf%3A%3AReporter).
 
 # METHODS
 
@@ -76,8 +76,8 @@ in the `$report` hash-ref passed to the ["reporter"](#reporter).
     use Devel::MojoProf -pg, -redis, -ua; # Load multiple
 
 Used to automatically ["add\_profiling\_for"](#add_profiling_for) know modules. Currently supported
-modules are [Mojo::mysql](https://metacpan.org/pod/Mojo::mysql), [Mojo::Pg](https://metacpan.org/pod/Mojo::Pg), [Mojo::Redis](https://metacpan.org/pod/Mojo::Redis), [Mojo::SQLite](https://metacpan.org/pod/Mojo::SQLite) and
-[Mojo::UserAgent](https://metacpan.org/pod/Mojo::UserAgent).
+modules are [Mojo::mysql](https://metacpan.org/pod/Mojo%3A%3Amysql), [Mojo::Pg](https://metacpan.org/pod/Mojo%3A%3APg), [Mojo::Redis](https://metacpan.org/pod/Mojo%3A%3ARedis), [Mojo::SQLite](https://metacpan.org/pod/Mojo%3A%3ASQLite) and
+[Mojo::UserAgent](https://metacpan.org/pod/Mojo%3A%3AUserAgent).
 
 Please submit a PR or create an issue if you think more modules should be
 supported at [https://github.com/jhthorsen/devel-mojoprof](https://github.com/jhthorsen/devel-mojoprof).
@@ -102,4 +102,4 @@ under the terms of the Artistic License version 2.0.
 
 # SEE ALSO
 
-This module is inspired by [Devel::KYTProf](https://metacpan.org/pod/Devel::KYTProf).
+This module is inspired by [Devel::KYTProf](https://metacpan.org/pod/Devel%3A%3AKYTProf).
