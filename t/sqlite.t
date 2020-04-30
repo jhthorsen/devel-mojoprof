@@ -5,10 +5,7 @@ use Test::More;
 plan skip_all => 'Mojo::SQLite is not available' unless Devel::MojoProf->_ensure_loaded('Mojo::SQLite', 1);
 
 my @report;
-Devel::MojoProf->singleton->reporter(sub {
-  push @report, $_[1];
-  shift->Devel::MojoProf::_default_reporter(@_) if $ENV{HARNESS_IS_VERBOSE};
-});
+Devel::MojoProf->singleton->reporter(sub { push @report, $_[1] });
 
 my $sqlite = Mojo::SQLite->new;
 my $db     = $sqlite->db;
